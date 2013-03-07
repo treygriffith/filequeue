@@ -46,7 +46,7 @@ How to Use
 ``` javascript
   for(var i=0; i<1000; i++) {
     fq.readFile('/somefile.txt', function(err, somefile) {
-
+      console.log("data from somefile.txt without crashing!", somefile);
     });
   }
 ```
