@@ -1,0 +1,28 @@
+{
+  "name": "filequeue",
+  "description": "Drop-in Replacement for fs to prevent too many open files",
+  "version": "0.0.1",
+  "author": {
+    "name": "Trey Griffith",
+    "email": "trey.griffith@gmail.com"
+  },
+  "keywords": [
+    "fs",
+    "filesystem",
+    "queue",
+    "emfile"
+  ],
+  "dependencies": {
+  },
+  "devDependencies": {
+  },
+  "main": "./index.js",
+  "engines": {
+    "node": "0.8.x"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/treygriffith/filequeue.git"
+  },
+  "homepage": "https://github.com/treygriffith/filequeue"
+}
