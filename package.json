@@ -1,7 +1,7 @@
 {
   "name": "filequeue",
   "description": "Drop-in Replacement for fs to prevent too many open files",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "author": {
     "name": "Trey Griffith",
     "email": "trey.griffith@gmail.com"
