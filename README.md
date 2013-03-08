@@ -37,11 +37,11 @@ How to Use
 ```
 
 #### Use any of the following supported `fs` methods
-* readFile
-* writeFile
-* readdir
-* stat
-* exists
+* [readFile](http://nodejs.org/api/fs.html#fs_fs_readfile_filename_encoding_callback)
+* [writeFile](http://nodejs.org/api/fs.html#fs_fs_writefile_filename_data_encoding_callback)
+* [readdir](http://nodejs.org/api/fs.html#fs_fs_readdir_path_callback)
+* [stat](http://nodejs.org/api/fs.html#fs_fs_stat_path_callback)
+* [exists](http://nodejs.org/api/fs.html#fs_fs_exists_path_callback)
 
 ``` javascript
   for(var i=0; i<1000; i++) {
@@ -53,4 +53,6 @@ How to Use
 
 Other Methods
 -------------
-Pull requests to add other fs methods are welcome - these are the methods I use most often, so I built in support for them.
+Add a new `fs` method is simple, just add it to the `fsMethods` array with the name and the arguments.
+
+Pull requests to add other fs methods with tests exercising them are welcome - the methods included are those I use most often, so I built in support for them.
