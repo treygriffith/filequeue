@@ -50,7 +50,7 @@ FileQueue.__set__('fs', {
 					isDirectory: function() {
 						return !isFile;
 					}
-				});				
+				});
 			});
 		}
 	},
@@ -73,6 +73,17 @@ FileQueue.__set__('fs', {
 				callback(null, exists);
 			});
 		}
+	},
+
+	mkdir: function(path, mode, callback) {
+		if(!callback) {
+			callback = mode;
+			mode = '0777';
+		}
+		files[path] = {
+			mode: mode
+		};
+		callback(null);
 	}
 });
 
@@ -200,6 +211,37 @@ describe('exists', function() {
 			assert.ifError(err);
 
 			assert.equal(exists, !!files['my_path']);
+
+			done();
+		});
+	});
+
+});
+
+describe('mkdir', function() {
+
+	var fq = new FileQueue();
+
+	it('should create a new directory with the default mode', function(done) {
+		var dirname = 'newdir';
+		fq.mkdir(dirname, function(err) {
+			assert.ifError(err);
+
+			assert.equal(typeof files[dirname], 'object');
+			assert.equal(files[dirname].mode, '0777');
+
+			done();
+		});
+	});
+
+	it('should create a new directory with a custom mode', function(done) {
+		var dirname = 'otherpath';
+		var mode = '0666';
+		fq.mkdir(dirname, mode, function(err) {
+			assert.ifError(err);
+
+			assert.equal(typeof files[dirname], 'object');
+			assert.equal(files[dirname].mode, mode);
 
 			done();
 		});
