@@ -40,6 +40,7 @@ How to Use
 * [readFile](http://nodejs.org/api/fs.html#fs_fs_readfile_filename_encoding_callback)
 * [writeFile](http://nodejs.org/api/fs.html#fs_fs_writefile_filename_data_encoding_callback)
 * [readdir](http://nodejs.org/api/fs.html#fs_fs_readdir_path_callback)
+* [rename](http://nodejs.org/api/fs.html#fs_fs_rename_oldpath_newpath_callback)
 * [mkdir](http://nodejs.org/api/fs.html#fs_fs_mkdir_path_mode_callback)
 * [stat](http://nodejs.org/api/fs.html#fs_fs_stat_path_callback)
 * [exists](http://nodejs.org/api/fs.html#fs_fs_exists_path_callback)

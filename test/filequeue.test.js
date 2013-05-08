@@ -1,14 +1,19 @@
+// Run this with "mocha filequeue.test.js"
+
 var assert = require('assert');
 var rewire = require('rewire');
 
 var FileQueue = rewire('../lib/filequeue');
 
 // change the fs dependency to one that we control
+/// This is our "dummy" filesystem:
 var files = {
 	'my_path' : 'some data',
 	'my_other_path' : 'some_other_data'
 };
 
+// The following is the "dummy" implementation of "fs", so our tests can be true
+//  "unit" tests
 FileQueue.__set__('fs', {
 	readFile: function(filename, encoding, callback) {
 		if(typeof encoding === 'function') {
@@ -61,6 +66,25 @@ FileQueue.__set__('fs', {
 		if(callback) {
 			process.nextTick(function() {
 				callback(null, keys);
+			});
+		}
+	},
+	
+	rename: function(oldPath, newPath, callback) {
+		var err;
+		
+		if (!files[oldPath]) {
+			err = 'no such file or directory';
+		} else if (!!files[newPath]) {
+			err = 'path already exists';
+		} else {
+			files[newPath] = files[oldPath];
+			delete files[oldPath];
+		}
+	
+		if (callback) {
+			process.nextTick(function () {
+				callback(err);
 			});
 		}
 	},
@@ -131,6 +155,37 @@ describe('readFile', function() {
 				}
 			});
 		}
+	});
+});
+
+describe('rename', function () {
+	var fq = new FileQueue();
+	
+	it('should rename a file', function(done) {
+		fq.writeFile('file-to-rename', 'arbitrary data', function(err) {
+			assert.ifError(err);
+			fq.exists('file-to-rename', function(err, exists) {
+				assert.ifError(err);
+				assert.equal(true, exists);
+				fq.exists('new-filename', function(err, exists) {
+					assert.ifError(err);
+					assert.equal(false, exists);
+					// RENAME THE FILE HERE
+					fq.rename('file-to-rename', 'new-filename', function(err) {
+						assert.ifError(err);
+						fq.exists('new-filename', function(err, exists) {
+							assert.ifError(err);
+							assert.equal(true, exists);
+							fq.exists('file-to-rename', function(err, exists) {
+								assert.ifError(err);
+								assert.equal(false, exists);
+								done();
+							});
+						});
+					});
+				});
+			});
+		});
 	});
 });
 
