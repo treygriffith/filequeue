@@ -55,7 +55,7 @@ How to Use
 
 ``` javascript
   for(var i=0; i<1000; i++) {
-    fq.readFile('/somefile.txt', function(err, somefile) {
+    fq.readFile('/somefile.txt', 'utf8', function(err, somefile) {
       console.log("data from somefile.txt without crashing!", somefile);
     });
   }
@@ -63,6 +63,6 @@ How to Use
 
 Other Methods
 -------------
-Add a new `fs` method is simple, just add it to the `methods.js` file with the name and the arguments.
+Adding a new `fs` method is simple, just add it to the `methods.js` file with the name and the arguments.
 
 Pull requests to add other fs methods with tests exercising them are welcome.
