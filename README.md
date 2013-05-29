@@ -28,12 +28,19 @@ How to Use
   var FileQueue = require('filequeue');
   var fq = new FileQueue(100);
 
-  // additional instances will attempt to use the same instance (and therefore the same maxfiles) unless the `newQueue` parameter is explicitly passed.
+  // additional instances will attempt to use the same instance (and therefore the same maxfiles)
 
   var FileQueue2 = require('filequeue');
-  var fq2 = new FileQueue(100);
+  var fq2 = new FileQueue2(100);
 
   console.log(fq === fq2); // => true
+
+  // you can force a new instance of filequeue with the `newQueue` parameter
+
+  var fq3 = new FileQueue(100, true);
+
+  console.log(fq === fq3); // => false
+
 ```
 
 #### Use any of the following supported `fs` methods
