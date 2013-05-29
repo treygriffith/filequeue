@@ -88,6 +88,28 @@ FileQueue.__set__('fs', {
 			});
 		}
 	},
+	
+	symlink: function(srcpath, dstpath, type, callback) {
+		var err;
+		
+		if (arguments.length < 4) {
+			callback = type;
+			type = 'file';   // type is optional, defaults to 'file'
+		}
+		
+		if (!!files[dstpath]) {
+			err = 'path already exists';
+		}
+		
+		files[dstpath] = { type: 'symlink', source: srcpath,
+							windows_type: type };
+		
+		if (callback) {
+			process.nextTick(function() {
+				callback(err);
+			});
+		}
+	},
 
 	exists: function(path, callback) {
 		var exists = !!files[path];
@@ -184,6 +206,41 @@ describe('rename', function () {
 						});
 					});
 				});
+			});
+		});
+	});
+});
+
+describe('symlink', function () {
+	var fq = new FileQueue();
+	
+	it('should create symlink without optional "type" argument',
+		function(done) {
+			fq.symlink('file-to-point-at', 'symlink1', function(err) {
+				assert.ifError(err);
+				fq.exists('symlink1', function(err, exists) {
+					assert.ifError(err);
+					assert.equal(true, exists);
+					// should check that file is symlink, once fq.lstat()
+					//  implemented
+					fq.symlink('another-file-to-point-at', 'symlink1',
+								function(err) {
+						assert.notEqual(err, null,
+										'expected error: path already exists');
+						done();
+					});
+				});
+			});
+	});
+	it('should create symlink with optional "type" argument', function(done) {
+		fq.symlink('file-to-point-at', 'symlink2', 'file', function(err) {
+			assert.ifError(err);
+			fq.exists('symlink2', function(err, exists) {
+				assert.ifError(err);
+				assert.equal(true, exists);
+				// should check that file is symlink, once fq.lstat()
+				//  implemented
+				done();
 			});
 		});
 	});
