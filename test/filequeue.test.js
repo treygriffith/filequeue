@@ -12,6 +12,126 @@ var files = {
 	'my_other_path' : 'some_other_data'
 };
 
+var filesystem = {
+	files: {
+		'my_path': {
+			data: new Buffer("some_data", 'utf8'),
+			mode: '0777'
+		},
+		'my_other_path': {
+			data: new Buffer("some_other_data", 'utf8'),
+			mode: '0777'
+		},
+		'my_dir': {
+			files: {
+				'my_third_path': {
+					data: new Buffer("even_more_data", 'utf8'),
+					mode: '0777'
+				}
+			},
+			mode: '0777'
+		},
+		'file-to-rename': {
+			data: new Buffer('I will be renamed.', 'utf8'),
+			mode: '0777'
+		}
+	},
+	mode: '0777'
+};
+
+// set up special dot directories
+filesystem.files['.'] = filesystem;
+filesystem.files.my_dir.files['.'] = filesystem.files.my_dir;
+filesystem.files.my_dir.files['..'] = filesystem;
+
+// find the object referred to in our dummy filesystem
+function fsPath(path) {
+	var parts = path.split('/');
+
+	var fs_path = filesystem;
+
+	for(var i=0; i<parts.length; i++) {
+
+		// undefined parts of the path just cause us to continue (e.g. /path//path2/ == /path/path2/)
+		if(!parts[i]) {
+			continue;
+		}
+
+		if(!fs_path || fs_path && !fs_path.files) {
+			return fileErr('does_not_exist', 'open', path);
+		}
+
+		fs_path = fs_path.files[parts[i]];
+	}
+
+	return fs_path;
+}
+
+// get the parent directory for a file in a path
+function parentDir(path) {
+	return fsPath(path.substring(0, path.lastIndexOf('/')));
+}
+
+// get only the filename for a file in a path
+function getFilename(path) {
+	return path.substring(path.lastIndexOf('/') + 1);
+}
+
+// test if a file object is a directory
+function isDirectory(obj) {
+	return !!obj && !!obj.files && typeof obj.files === 'object';
+}
+
+function fileErr(errName, op, path) {
+	var error;
+
+	switch(errName) {
+		case 'does_not_exist':
+
+			error = new Error("Error: ENOENT, "+op+" '"+path+"'");
+			error.code = 'ENOENT';
+			error.path = path;
+			error.errno = 34;
+
+		break;
+
+		case 'is_dir':
+
+			error = new Error("Error: EISDIR, "+op);
+			error.code = 'EISDIR';
+			error.errno = 28;
+		break;
+
+		case 'not_dir':
+
+			error = new Error("Error: ENOTDIR, "+op+" '"+path+"'");
+			error.code = 'ENOTDIR';
+			error.errno = 27;
+			error.path = path;
+		break;
+
+		case 'dir_exists':
+
+			error = new Error("Error: EEXIST, "+op+" '"+path+"'");
+			error.code = 'EEXIST';
+			error.errno = 47;
+			error.path = path;
+		break;
+	}
+
+	return error;
+}
+
+function delayCallback(cb) {
+	return function() {
+		var _this = this;
+		var args = [].slice.call(arguments);
+		process.nextTick(function() {
+			cb.apply(_this, args);
+		});
+	};
+}
+
 // The following is the "dummy" implementation of "fs", so our tests can be true
 //  "unit" tests
 FileQueue.__set__('fs', {
@@ -20,90 +140,184 @@ FileQueue.__set__('fs', {
 			callback = encoding;
 			encoding = null;
 		}
-		if(callback) {
-			process.nextTick(function() {
-				callback(null, files[filename]);
-			});
+
+		if(!callback) {
+			callback = function(){};
 		}
+
+		callback = delayCallback(callback);
+
+		var file = fsPath(filename);
+
+		if(!file) {
+			callback(fileErr('does_not_exist', 'read', filename));
+			return;
+		}
+
+		if(file instanceof Error) {
+			callback(file);
+			return;
+		}
+
+		// this might be a directory
+		if(!(file.data instanceof Buffer)) {
+			callback(fileErr('is_dir', 'read'));
+			return;
+		}
+
+		// if encoding is defined, convert buffer to string
+		if(encoding) {
+			callback(null, file.data.toString(encoding));
+			return;
+		}
+
+		// return the raw buffer
+		callback(null, file.data);
 	},
 
 	writeFile: function(filename, data, encoding, callback) {
 		if(typeof encoding === 'function') {
 			callback = encoding;
-			encoding = null;
+			encoding = 'utf8';
 		}
 
-		files[filename] = data;
-
-		if(callback) {
-			process.nextTick(function() {
-				callback(null);
-			});
+		if(!callback) {
+			callback = function() {};
 		}
+
+		callback = delayCallback(callback);
+
+		var file = fsPath(filename);
+
+		// valid directory, but no file defined
+		if(!file) {
+			var dir = parentDir(filename);
+			file = dir.files[getFilename(filename)] = {
+				mode: '0777'
+			};
+		}
+
+		if(file instanceof Error) {
+			callback(file);
+			return;
+		}
+
+		if(data instanceof Buffer) {
+			file.data = data;
+		} else {
+			file.data = new Buffer(data, encoding);
+		}
+
+		callback();
 	},
 
 	stat: function(path, callback) {
-		var isFile = !!files[path];
 
-		if(callback) {
-			// call back with a miniature version of fs.Stats
-			process.nextTick(function() {
-				callback(null, {
-					isFile: function() {
-						return isFile;
-					},
-					isDirectory: function() {
-						return !isFile;
-					}
-				});
-			});
+		callback = callback || function() {};
+		callback = delayCallback(callback);
+
+		var file = fsPath(path);
+
+		if(file instanceof Error) {
+			callback(file);
 		}
+
+		if(!file) {
+			callback(fileErr('does_not_exist', 'stat', path));
+		}
+
+		// call back with a miniature version of fs.Stats
+		callback(null, {
+			isFile: function() {
+				return file.data instanceof Buffer;
+			},
+			isDirectory: function() {
+				return isDirectory(file);
+			}
+		});
 	},
 
 	readdir: function(path, callback) {
-		var keys = Object.keys(files);
+		callback = callback || function() {};
+		callback = delayCallback(callback);
 
-		if(callback) {
-			process.nextTick(function() {
-				callback(null, keys);
-			});
+		var dir = fsPath(path);
+
+		if(dir instanceof Error) {
+			callback(dir);
+			return;
 		}
+
+		if(!dir) {
+			callback(fileErr('does_not_exist', 'readdir', path));
+			return;
+		}
+
+		if(!isDirectory(dir)) {
+			callback(fileErr('not_dir', 'readdir', path));
+			return;
+		}
+
+		callback(null, Object.keys(dir.files));
 	},
-	
+
 	rename: function(oldPath, newPath, callback) {
-		var err;
-		
-		if (!files[oldPath]) {
-			err = 'no such file or directory';
-		} else if (!!files[newPath]) {
-			err = 'path already exists';
-		} else {
-			files[newPath] = files[oldPath];
-			delete files[oldPath];
+		callback = callback || function() {};
+		callback = delayCallback(callback);
+
+		var oldFile = fsPath(oldPath);
+
+		if(oldFile instanceof Error) {
+			callback(oldFile);
+			return;
 		}
-	
-		if (callback) {
-			process.nextTick(function () {
-				callback(err);
-			});
+
+		if(!oldFile) {
+			callback(fileErr('does_not_exist', 'rename', oldPath));
+			return;
 		}
+
+		var newDir = parentDir(newPath);
+
+		if(newDir instanceof Error) {
+			callback(newDir);
+			return;
+		}
+
+		if(!newDir) {
+			callback(fileErr('does_not_exist', 'rename', oldPath));
+			return;
+		}
+
+		if(!isDirectory(newDir)) {
+			callback(fileErr('not_dir', 'rename', oldPath));
+			return;
+		}
+
+		// set it in the new location
+		newDir.files[getFilename(newPath)] = oldFile;
+
+		// remove the old location
+		delete parentDir(oldPath).files[getFilename(oldPath)];
+
+		callback();
 	},
-	
+
 	symlink: function(srcpath, dstpath, type, callback) {
 		var err;
-		
+
 		if (arguments.length < 4) {
 			callback = type;
 			type = 'file';   // type is optional, defaults to 'file'
 		}
-		
+
 		if (!!files[dstpath]) {
 			err = 'path already exists';
 		}
-		
+
 		files[dstpath] = { type: 'symlink', source: srcpath,
 							windows_type: type };
-		
+
 		if (callback) {
 			process.nextTick(function() {
 				callback(err);
@@ -112,13 +326,22 @@ FileQueue.__set__('fs', {
 	},
 
 	exists: function(path, callback) {
-		var exists = !!files[path];
+		callback = callback || function() {};
+		callback = delayCallback(callback);
 
-		if(callback) {
-			process.nextTick(function() {
-				callback(null, exists);
-			});
+		var file = fsPath(path);
+
+		if(file instanceof Error) {
+			callback(false);
+			return;
 		}
+
+		if(!file) {
+			callback(false);
+			return;
+		}
+
+		callback(true);
 	},
 
 	mkdir: function(path, mode, callback) {
@@ -126,10 +349,36 @@ FileQueue.__set__('fs', {
 			callback = mode;
 			mode = '0777';
 		}
-		files[path] = {
-			mode: mode
+
+		callback = callback || function() {};
+		callback = delayCallback(callback);
+
+		var dir = parentDir(path);
+
+		if(dir instanceof Error) {
+			callback(dir);
+			return;
+		}
+
+		if(!dir) {
+			callback(fileErr('does_not_exist', 'mkdir', path));
+			return;
+		}
+
+		if(!isDirectory(dir)) {
+			callback(fileError('not_dir', 'mkdir', path));
+			return;
+		}
+
+		var newDir = dir.files[getFilename(path)] = {
+			mode: mode,
+			files: {}
 		};
-		callback(null);
+
+		newDir.files['.'] = newDir;
+		newDir.files['..'] = dir;
+
+		callback();
 	}
 });
 
@@ -161,7 +410,7 @@ describe('readFile', function() {
 
 	it('should read file contents', function(done) {
 		fq.readFile('my_path', function(err, data) {
-			assert.equal(data, files['my_path']);
+			assert.equal(data, filesystem.files['my_path'].data);
 			done();
 		});
 	});
@@ -170,7 +419,7 @@ describe('readFile', function() {
 		var count = 0;
 		for(var i=0;i<1000;i++) {
 			fq.readFile('my_other_path', function(err, data) {
-				assert.equal(data, files['my_other_path']);
+				assert.equal(data, filesystem.files['my_other_path'].data);
 
 				if(++count >= 1000) {
 					done();
@@ -182,33 +431,30 @@ describe('readFile', function() {
 
 describe('rename', function () {
 	var fq = new FileQueue();
-	
+
 	it('should rename a file', function(done) {
-		fq.writeFile('file-to-rename', 'arbitrary data', function(err) {
+
+		// retrieve the contents of the original file
+		fq.readFile('file-to-rename', 'utf8', function(err, contents) {
+
 			assert.ifError(err);
-			fq.exists('file-to-rename', function(err, exists) {
+
+			fq.rename('file-to-rename', 'this_is_a_different_file', function(err) {
+
 				assert.ifError(err);
-				assert.equal(true, exists);
-				fq.exists('new-filename', function(err, exists) {
+
+				fq.readFile('this_is_a_different_file', 'utf8', function(err, renamed_contents) {
+
 					assert.ifError(err);
-					assert.equal(false, exists);
-					// RENAME THE FILE HERE
-					fq.rename('file-to-rename', 'new-filename', function(err) {
-						assert.ifError(err);
-						fq.exists('new-filename', function(err, exists) {
-							assert.ifError(err);
-							assert.equal(true, exists);
-							fq.exists('file-to-rename', function(err, exists) {
-								assert.ifError(err);
-								assert.equal(false, exists);
-								done();
-							});
-						});
-					});
+
+					assert.equal(contents, renamed_contents);
+
+					done();
 				});
 			});
 		});
 	});
+
 });
 
 describe('symlink', function () {
@@ -251,10 +497,13 @@ describe('writeFile', function() {
 	var fq = new FileQueue();
 
 	it('should write file contents', function(done) {
-		fq.writeFile('my_path', 'some different data', function(err) {
+
+		fq.writeFile('my_path', 'some different data', 'utf8', function(err) {
+
 			assert.ifError(err);
 
-			fq.readFile('my_path', function(err, data) {
+			fq.readFile('my_path', 'utf8', function(err, data) {
+
 				assert.equal(data, 'some different data');
 				done();
 			});
@@ -265,17 +514,22 @@ describe('writeFile', function() {
 		var count = 0;
 		for(var i=0;i<1000;i++) {
 			(function(num) {
-				fq.writeFile('my_path_'+num, 'some different data '+num, function(err) {
+
+				fq.writeFile('my_path_'+num, 'some different data '+num, 'utf8', function(err) {
+
 					assert.ifError(err);
 
-					fq.readFile('my_path_'+num, function(err, data) {
+					fq.readFile('my_path_'+num, 'utf8', function(err, data) {
+
 						assert.equal(data, 'some different data '+num);
 
 						if(++count >= 1000) {
+
 							done();
 						}
 					});
 				});
+
 			})(i);
 		}
 	});
@@ -287,10 +541,13 @@ describe('stat', function() {
 	var fq = new FileQueue();
 
 	it('should return a stats object', function(done) {
+
 		fq.stat('my_path', function(err, stats) {
+
 			assert.ifError(err);
 
-			assert.equal(stats.isFile(), !!files['my_path']);
+			assert.equal(stats.isFile(), fsPath('my_path').data instanceof Buffer);
+			assert.equal(stats.isDirectory(), isDirectory(fsPath('my_path')));
 
 			done();
 		});
@@ -303,10 +560,12 @@ describe('readdir', function() {
 	var fq = new FileQueue();
 
 	it('should return all filenames', function(done) {
-		fq.readdir('irrelevant', function(err, _files) {
+
+		fq.readdir('.', function(err, _files) {
+
 			assert.ifError(err);
 
-			assert.equal(Object.keys(files).length, _files.length);
+			assert.equal(Object.keys(filesystem.files).length, _files.length);
 
 			done();
 		});
@@ -319,14 +578,25 @@ describe('exists', function() {
 	var fq = new FileQueue();
 
 	it('should check if a file exists', function(done) {
-		fq.exists('my_path', function(err, exists) {
-			assert.ifError(err);
 
-			assert.equal(exists, !!files['my_path']);
+		fq.exists('my_path', function(exists) {
+
+			assert.equal(exists, !!fsPath('my_path'));
 
 			done();
 		});
 	});
+
+	it('should confirm that a file does not exist', function(done) {
+
+		fq.exists('this_file_doesnt_exist', function(exists) {
+
+			assert.equal(exists, !!fsPath('this_file_doesnt_exist'));
+
+			done();
+		});
+	});
+
 
 });
 
@@ -336,11 +606,12 @@ describe('mkdir', function() {
 
 	it('should create a new directory with the default mode', function(done) {
 		var dirname = 'newdir';
+
 		fq.mkdir(dirname, function(err) {
 			assert.ifError(err);
 
-			assert.equal(typeof files[dirname], 'object');
-			assert.equal(files[dirname].mode, '0777');
+			assert.equal(isDirectory(filesystem.files[dirname]), true);
+			assert.equal(filesystem.files[dirname].mode, '0777');
 
 			done();
 		});
@@ -352,8 +623,8 @@ describe('mkdir', function() {
 		fq.mkdir(dirname, mode, function(err) {
 			assert.ifError(err);
 
-			assert.equal(typeof files[dirname], 'object');
-			assert.equal(files[dirname].mode, mode);
+			assert.equal(isDirectory(filesystem.files[dirname]), true);
+			assert.equal(filesystem.files[dirname].mode, mode);
 
 			done();
 		});
