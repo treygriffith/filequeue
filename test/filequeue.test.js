@@ -34,6 +34,14 @@ var filesystem = {
 		'file-to-rename': {
 			data: new Buffer('I will be renamed.', 'utf8'),
 			mode: '0777'
+		},
+		'file-to-point-at': {
+			data: new Buffer('something will link to me.', 'utf8'),
+			mode: '0777'
+		},
+		'another-file-to-point-at': {
+			data: new Buffer('something else will link to me', 'utf8'),
+			mode: '0777'
 		}
 	},
 	mode: '0777'
@@ -110,7 +118,7 @@ function fileErr(errName, op, path) {
 			error.path = path;
 		break;
 
-		case 'dir_exists':
+		case 'exists':
 
 			error = new Error("Error: EEXIST, "+op+" '"+path+"'");
 			error.code = 'EEXIST';
@@ -303,26 +311,59 @@ FileQueue.__set__('fs', {
 		callback();
 	},
 
-	symlink: function(srcpath, dstpath, type, callback) {
-		var err;
-
+	symlink: function(srcPath, dstPath, type, callback) {
 		if (arguments.length < 4) {
 			callback = type;
 			type = 'file';   // type is optional, defaults to 'file'
 		}
 
-		if (!!files[dstpath]) {
-			err = 'path already exists';
+		callback = callback || function() {};
+		callback = delayCallback(callback);
+
+		var srcFile = fsPath(srcPath);
+
+		if(srcFile instanceof Error) {
+			callback(srcFile);
+			return;
 		}
 
-		files[dstpath] = { type: 'symlink', source: srcpath,
-							windows_type: type };
-
-		if (callback) {
-			process.nextTick(function() {
-				callback(err);
-			});
+		if(!srcFile) {
+			callback(fileErr('does_not_exist', 'symlink', srcPath));
+			return;
 		}
+
+		var dstDir = parentDir(dstPath);
+
+		if(dstDir instanceof Error) {
+			callback(dstDir);
+			return;
+		}
+
+		if(!dstDir) {
+			callback(fileErr('does_not_exist', 'symlink', srcPath));
+			return;
+		}
+
+		if(!isDirectory(dstDir)) {
+			callback(fileErr('not_dir', 'symlink', srcPath));
+			return;
+		}
+
+		if(!!dstDir.files[getFilename(dstPath)]) {
+			callback(fileErr('exists', 'symlink', srcPath));
+			return;
+		}
+
+
+		dstDir.files[getFilename(dstPath)] = {
+			type: 'symlink',
+			source: srcPath,
+			files: srcFile.files,
+			data: srcFile.data,
+			windows_type: type
+		};
+
+		callback();
 	},
 
 	exists: function(path, callback) {
@@ -366,7 +407,12 @@ FileQueue.__set__('fs', {
 		}
 
 		if(!isDirectory(dir)) {
-			callback(fileError('not_dir', 'mkdir', path));
+			callback(fileErr('not_dir', 'mkdir', path));
+			return;
+		}
+
+		if(!!dir.files[getFilename(path)]) {
+			callback(fileErr('exists', 'mkdir', path));
 			return;
 		}
 
@@ -459,34 +505,66 @@ describe('rename', function () {
 
 describe('symlink', function () {
 	var fq = new FileQueue();
-	
-	it('should create symlink without optional "type" argument',
-		function(done) {
+
+	it('should create symlink without optional "type" argument', function(done) {
+
+		// grab the contents of the source file
+		fq.readFile('file-to-point-at', 'utf8', function(err, contents) {
+
+			assert.ifError(err);
+
 			fq.symlink('file-to-point-at', 'symlink1', function(err) {
+
 				assert.ifError(err);
-				fq.exists('symlink1', function(err, exists) {
+
+				// check that file is symlink (should do this with fq.lstat once implemented)
+				assert.equal(filesystem.files['symlink1'].type, 'symlink');
+
+				// check that the contents are identical
+				fq.readFile('symlink1', 'utf8', function(err, symlinked_contents) {
+
 					assert.ifError(err);
-					assert.equal(true, exists);
-					// should check that file is symlink, once fq.lstat()
-					//  implemented
-					fq.symlink('another-file-to-point-at', 'symlink1',
-								function(err) {
-						assert.notEqual(err, null,
-										'expected error: path already exists');
+
+					assert.equal(contents, symlinked_contents);
+
+					// check that we can't create another symlink with the same name
+					fq.symlink('another-file-to-point-at', 'symlink1', function(err) {
+
+						assert.notEqual(err, null, 'expected error: path already exists');
+
 						done();
 					});
 				});
 			});
+		});
 	});
+
 	it('should create symlink with optional "type" argument', function(done) {
-		fq.symlink('file-to-point-at', 'symlink2', 'file', function(err) {
+
+		// grab the contents of the source file
+		fq.readFile('file-to-point-at', 'utf8', function(err, contents) {
+
 			assert.ifError(err);
-			fq.exists('symlink2', function(err, exists) {
+
+			fq.symlink('file-to-point-at', 'symlink2', 'file', function(err) {
+
 				assert.ifError(err);
-				assert.equal(true, exists);
-				// should check that file is symlink, once fq.lstat()
-				//  implemented
-				done();
+
+				// check that file is symlink, (should do this with fq.lstat once implemented)
+				assert.equal(filesystem.files['symlink2'].type, 'symlink');
+
+				// check that the contents are identical
+				fq.readFile('symlink2', 'utf8', function(err, symlinked_contents) {
+
+					assert.ifError(err);
+
+					assert.equal(contents, symlinked_contents);
+
+					// check that the type of symlink is correct
+					assert.equal(filesystem.files['symlink2'].windows_type, 'file');
+
+					done();
+				});
 			});
 		});
 	});
