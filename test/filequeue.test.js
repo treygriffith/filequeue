@@ -67,7 +67,7 @@ describe('readFile', function() {
 
 			var count = 0;
 			for(var i=0;i<1000;i++) {
-				fq.readFile('my_other_path', {encoding: 'utf8'}, function(err, data) {
+				fq.readFile(makePath('my_other_path'), {encoding: 'utf8'}, function(err, data) {
 
 					assert.ifError(err);
 
@@ -146,7 +146,7 @@ describe('symlink', function () {
 
 	});
 
-	it('should create symlink with optional "type" argument', function(done) {
+	it('should create symlink with optional "type" argument', function() {
 
 		// only applicable on windows environments, which I don't have a box for
 	});
@@ -251,9 +251,9 @@ describe('exists', function() {
 
 	it('should check if a file exists', function(done) {
 
-		fq.exists('my_path', function(exists) {
+		fq.exists(makePath('my_path'), function(exists) {
 
-			assert.equal(exists, !!fs.__internal.fsPath('my_path'));
+			assert.equal(exists, fs.existsSync(makePath('my_path')));
 
 			done();
 		});
@@ -261,9 +261,9 @@ describe('exists', function() {
 
 	it('should confirm that a file does not exist', function(done) {
 
-		fq.exists('this_file_doesnt_exist', function(exists) {
+		fq.exists(makePath('this_file_doesnt_exist'), function(exists) {
 
-			assert.equal(exists, !!fs.__internal.fsPath('this_file_doesnt_exist'));
+			assert.equal(exists, fs.existsSync(makePath('this_file_doesnt_exist')));
 
 			done();
 		});
@@ -279,11 +279,13 @@ describe('mkdir', function() {
 	it('should create a new directory with the default mode', function(done) {
 		var dirname = 'newdir';
 
-		fq.mkdir(dirname, function(err) {
+		fq.mkdir(makePath(dirname), function(err) {
 			assert.ifError(err);
 
-			assert.equal(fs.__internal.isDirectory(fs.__internal.filesystem.files[dirname]), true);
-			assert.equal(fs.__internal.filesystem.files[dirname].mode, '0777');
+			var stats = fs.statSync(makePath(dirname));
+
+			assert.equal(stats.isDirectory(), true);
+			assert.equal(stats.mode, 511 /* 0777 */);
 
 			done();
 		});
@@ -292,11 +294,13 @@ describe('mkdir', function() {
 	it('should create a new directory with a custom mode', function(done) {
 		var dirname = 'otherpath';
 		var mode = '0666';
-		fq.mkdir(dirname, mode, function(err) {
+		fq.mkdir(makePath(dirname), mode, function(err) {
 			assert.ifError(err);
 
-			assert.equal(fs.__internal.isDirectory(fs.__internal.filesystem.files[dirname]), true);
-			assert.equal(fs.__internal.filesystem.files[dirname].mode, mode);
+			var stats = fs.statSync(makePath(dirname));
+
+			assert.equal(stats.isDirectory(), true);
+			assert.equal(stats.mode, parseInt(mode, 8));
 
 			done();
 		});
