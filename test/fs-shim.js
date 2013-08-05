@@ -41,6 +41,8 @@ filesystem.files['.'] = filesystem;
 filesystem.files.my_dir.files['.'] = filesystem.files.my_dir;
 filesystem.files.my_dir.files['..'] = filesystem;
 
+
+
 // find the object referred to in our dummy filesystem
 function fsPath(path) {
 	var parts = path.split('/');

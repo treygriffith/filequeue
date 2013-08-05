@@ -1,14 +1,17 @@
 // Run this with "mocha filequeue.test.js"
 
 var assert = require('assert');
-var rewire = require('rewire');
+var temp = require('temp');
+var fs = require('fs');
+var path = require('path');
 
 var FileQueue = rewire('../lib/filequeue');
 
-// Shim in our controlled version of fs
-var fs = require('./fs-shim');
-FileQueue.__set__('fs', fs);
+var dir = temp.mkdirSync('filequeue-test');
 
+function makePath(filename) {
+	return path.join(dir, filename);
+}
 
 describe('FileQueue', function() {
 
@@ -36,23 +39,46 @@ describe('readFile', function() {
 	var fq = new FileQueue(200);
 
 	it('should read file contents', function(done) {
-		fq.readFile('my_path', function(err, data) {
-			assert.equal(data, fs.__internal.filesystem.files['my_path'].data);
-			done();
+
+		var text = 'some random text';
+
+		fs.writeFile(makePath('my_path'), text, function(err) {
+
+			assert.ifError(err);
+
+			fq.readFile(makePath('my_path'), {encoding: 'utf8'}, function(err, data) {
+
+				assert.ifError(err);
+
+				assert.equal(data, text);
+
+				done();
+			});
 		});
 	});
 
 	it('should read many files without crashing', function(done) {
-		var count = 0;
-		for(var i=0;i<1000;i++) {
-			fq.readFile('my_other_path', function(err, data) {
-				assert.equal(data, fs.__internal.filesystem.files['my_other_path'].data);
 
-				if(++count >= 1000) {
-					done();
-				}
-			});
-		}
+		var text = 'some other text';
+
+		fs.writeFile(makePath('my_other_path'), text, function(err) {
+
+			assert.ifError(err);
+
+			var count = 0;
+			for(var i=0;i<1000;i++) {
+				fq.readFile('my_other_path', {encoding: 'utf8'}, function(err, data) {
+
+					assert.ifError(err);
+
+					assert.equal(data, text);
+
+					if(++count >= 1000) {
+						done();
+					}
+				});
+			}
+		});
 	});
 });
 
