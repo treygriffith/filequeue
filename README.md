@@ -63,6 +63,6 @@ How to Use
 
 Other Methods
 -------------
-Adding a new `fs` method is simple, just add it to the `methods.js` file with the name and the arguments.
+Adding a new `fs` method is simple, just add it to the `methods.js` file following the conventions therein.
 
 Pull requests to add other fs methods with tests exercising them are welcome.

@@ -62,7 +62,7 @@ describe('rename', function () {
 	it('should rename a file', function(done) {
 
 		// retrieve the contents of the original file
-		fq.readFile('file-to-rename', 'utf8', function(err, contents) {
+		fq.readFile('file-to-rename', {encoding: 'utf8'}, function(err, contents) {
 
 			assert.ifError(err);
 
@@ -70,7 +70,7 @@ describe('rename', function () {
 
 				assert.ifError(err);
 
-				fq.readFile('this_is_a_different_file', 'utf8', function(err, renamed_contents) {
+				fq.readFile('this_is_a_different_file', {encoding: 'utf8'}, function(err, renamed_contents) {
 
 					assert.ifError(err);
 
@@ -90,7 +90,7 @@ describe('symlink', function () {
 	it('should create symlink without optional "type" argument', function(done) {
 
 		// grab the contents of the source file
-		fq.readFile('file-to-point-at', 'utf8', function(err, contents) {
+		fq.readFile('file-to-point-at', {encoding: 'utf8'}, function(err, contents) {
 
 			assert.ifError(err);
 
@@ -102,7 +102,7 @@ describe('symlink', function () {
 				assert.equal(fs.__internal.filesystem.files['symlink1'].type, 'symlink');
 
 				// check that the contents are identical
-				fq.readFile('symlink1', 'utf8', function(err, symlinked_contents) {
+				fq.readFile('symlink1', {encoding: 'utf8'}, function(err, symlinked_contents) {
 
 					assert.ifError(err);
 
@@ -123,7 +123,7 @@ describe('symlink', function () {
 	it('should create symlink with optional "type" argument', function(done) {
 
 		// grab the contents of the source file
-		fq.readFile('file-to-point-at', 'utf8', function(err, contents) {
+		fq.readFile('file-to-point-at', {encoding: 'utf8'}, function(err, contents) {
 
 			assert.ifError(err);
 
@@ -157,11 +157,11 @@ describe('writeFile', function() {
 
 	it('should write file contents', function(done) {
 
-		fq.writeFile('my_path', 'some different data', 'utf8', function(err) {
+		fq.writeFile('my_path', 'some different data', {encoding: 'utf8'}, function(err) {
 
 			assert.ifError(err);
 
-			fq.readFile('my_path', 'utf8', function(err, data) {
+			fq.readFile('my_path', {encoding: 'utf8'}, function(err, data) {
 
 				assert.equal(data, 'some different data');
 				done();
@@ -169,16 +169,16 @@ describe('writeFile', function() {
 		});
 	});
 
-	it('should read many files without crashing', function(done) {
+	it('should write many files without crashing', function(done) {
 		var count = 0;
 		for(var i=0;i<1000;i++) {
 			(function(num) {
 
-				fq.writeFile('my_path_'+num, 'some different data '+num, 'utf8', function(err) {
+				fq.writeFile('my_path_'+num, 'some different data '+num, {encoding: 'utf8'}, function(err) {
 
 					assert.ifError(err);
 
-					fq.readFile('my_path_'+num, 'utf8', function(err, data) {
+					fq.readFile('my_path_'+num, {encoding: 'utf8'}, function(err, data) {
 
 						assert.equal(data, 'some different data '+num);
 
