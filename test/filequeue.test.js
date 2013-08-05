@@ -5,9 +5,9 @@ var temp = require('temp');
 var fs = require('fs');
 var path = require('path');
 
-var FileQueue = rewire('../lib/filequeue');
+var FileQueue = require('../lib/filequeue');
 
-var dir = temp.mkdirSync('filequeue-test');
+var dir = temp.mkdirSync('filequeue-test-');
 
 function makePath(filename) {
 	return path.join(dir, filename);
@@ -34,9 +34,10 @@ describe('FileQueue', function() {
 
 });
 
-describe('readFile', function() {
+// set `newQueue` to true so we don't get the instance with a limit of 2000
+var fq = new FileQueue(true);
 
-	var fq = new FileQueue(200);
+describe('readFile', function() {
 
 	it('should read file contents', function(done) {
 
@@ -83,7 +84,6 @@ describe('readFile', function() {
 });
 
 describe('rename', function () {
-	var fq = new FileQueue();
 
 	it('should rename a file', function(done) {
 
@@ -112,7 +112,6 @@ describe('rename', function () {
 });
 
 describe('symlink', function () {
-	var fq = new FileQueue();
 
 	it('should create symlink without optional "type" argument', function(done) {
 
@@ -153,8 +152,6 @@ describe('symlink', function () {
 });
 
 describe('writeFile', function() {
-
-	var fq = new FileQueue();
 
 	it('should write file contents', function(done) {
 
@@ -200,8 +197,6 @@ describe('writeFile', function() {
 
 describe('stat', function() {
 
-	var fq = new FileQueue();
-
 	it('should return a stats object', function(done) {
 
 		fq.stat(makePath('my_path'), function(err, stats) {
@@ -224,8 +219,6 @@ describe('stat', function() {
 
 describe('readdir', function() {
 
-	var fq = new FileQueue();
-
 	it('should return all filenames', function(done) {
 
 		fq.readdir(dir, function(err, files) {
@@ -246,8 +239,6 @@ describe('readdir', function() {
 });
 
 describe('exists', function() {
-
-	var fq = new FileQueue();
 
 	it('should check if a file exists', function(done) {
 
@@ -273,8 +264,6 @@ describe('exists', function() {
 });
 
 describe('mkdir', function() {
-
-	var fq = new FileQueue();
 
 	it('should create a new directory with the default mode', function(done) {
 		var dirname = 'newdir';
