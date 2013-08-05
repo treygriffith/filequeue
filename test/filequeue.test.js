@@ -97,7 +97,7 @@ describe('rename', function () {
 
 				assert.ifError(err);
 
-				fs.readFile('this_is_a_different_file', {encoding: 'utf8'}, function(err, contents) {
+				fs.readFile(makePath('this_is_a_different_file'), {encoding: 'utf8'}, function(err, contents) {
 
 					assert.ifError(err);
 
@@ -116,27 +116,25 @@ describe('symlink', function () {
 
 	it('should create symlink without optional "type" argument', function(done) {
 
-		// grab the contents of the source file
-		fq.readFile('file-to-point-at', {encoding: 'utf8'}, function(err, contents) {
+		var text = "this file will be symlinked";
+
+		fs.writeFile(makePath('file-to-point-at'), text, function(err) {
 
 			assert.ifError(err);
 
-			fq.symlink('file-to-point-at', 'symlink1', function(err) {
+			fq.symlink(makePath('file-to-point-at'), makePath('symlink1'), function(err) {
 
 				assert.ifError(err);
 
-				// check that file is symlink (should do this with fq.lstat once implemented)
-				assert.equal(fs.__internal.filesystem.files['symlink1'].type, 'symlink');
-
-				// check that the contents are identical
-				fq.readFile('symlink1', {encoding: 'utf8'}, function(err, symlinked_contents) {
+				fs.lstat(makePath('symlink1'), function(err, stats) {
 
 					assert.ifError(err);
 
-					assert.equal(contents, symlinked_contents);
+					// make sure we created a symlink
+					assert.ok(stats.isSymbolicLink());
 
 					// check that we can't create another symlink with the same name
-					fq.symlink('another-file-to-point-at', 'symlink1', function(err) {
+					fq.symlink(makePath('file-to-point-at'), makePath('symlink1'), function(err) {
 
 						assert.notEqual(err, null, 'expected error: path already exists');
 
@@ -145,36 +143,12 @@ describe('symlink', function () {
 				});
 			});
 		});
+
 	});
 
 	it('should create symlink with optional "type" argument', function(done) {
 
-		// grab the contents of the source file
-		fq.readFile('file-to-point-at', {encoding: 'utf8'}, function(err, contents) {
-
-			assert.ifError(err);
-
-			fq.symlink('file-to-point-at', 'symlink2', 'file', function(err) {
-
-				assert.ifError(err);
-
-				// check that file is symlink, (should do this with fq.lstat once implemented)
-				assert.equal(fs.__internal.filesystem.files['symlink2'].type, 'symlink');
-
-				// check that the contents are identical
-				fq.readFile('symlink2', 'utf8', function(err, symlinked_contents) {
-
-					assert.ifError(err);
-
-					assert.equal(contents, symlinked_contents);
-
-					// check that the type of symlink is correct
-					assert.equal(fs.__internal.filesystem.files['symlink2'].windows_type, 'file');
-
-					done();
-				});
-			});
-		});
+		// only applicable on windows environments, which I don't have a box for
 	});
 });
 
