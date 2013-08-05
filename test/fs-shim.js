@@ -132,15 +132,13 @@ function delayCallback(cb) {
 // The following is the "dummy" implementation of "fs", so our tests can be true
 //  "unit" tests
 
-exports.readFile = function(filename, encoding, callback) {
-	if(typeof encoding === 'function') {
-		callback = encoding;
-		encoding = null;
+exports.readFile = function(filename, options, callback) {
+	if(!callback) {
+		callback = options;
+		options = null;
 	}
 
-	if(!callback) {
-		callback = function(){};
-	}
+	var encoding = options && options.encoding;
 
 	callback = delayCallback(callback);
 
@@ -172,15 +170,14 @@ exports.readFile = function(filename, encoding, callback) {
 	callback(null, file.data);
 };
 
-exports.writeFile = function(filename, data, encoding, callback) {
-	if(typeof encoding === 'function') {
-		callback = encoding;
-		encoding = 'utf8';
-	}
+exports.writeFile = function(filename, data, options, callback) {
 
 	if(!callback) {
-		callback = function() {};
+		callback = options;
+		options = null;
 	}
+
+	var encoding = (options && options.encoding) || 'utf8';
 
 	callback = delayCallback(callback);
 
@@ -210,7 +207,6 @@ exports.writeFile = function(filename, data, encoding, callback) {
 
 exports.stat = function(path, callback) {
 
-	callback = callback || function() {};
 	callback = delayCallback(callback);
 
 	var file = fsPath(path);
@@ -235,7 +231,6 @@ exports.stat = function(path, callback) {
 };
 
 exports.readdir = function(path, callback) {
-	callback = callback || function() {};
 	callback = delayCallback(callback);
 
 	var dir = fsPath(path);
@@ -259,7 +254,6 @@ exports.readdir = function(path, callback) {
 };
 
 exports.rename = function(oldPath, newPath, callback) {
-	callback = callback || function() {};
 	callback = delayCallback(callback);
 
 	var oldFile = fsPath(oldPath);
@@ -306,7 +300,6 @@ exports.symlink = function(srcPath, dstPath, type, callback) {
 		type = 'file';   // type is optional, defaults to 'file'
 	}
 
-	callback = callback || function() {};
 	callback = delayCallback(callback);
 
 	var srcFile = fsPath(srcPath);
@@ -356,7 +349,6 @@ exports.symlink = function(srcPath, dstPath, type, callback) {
 };
 
 exports.exists = function(path, callback) {
-	callback = callback || function() {};
 	callback = delayCallback(callback);
 
 	var file = fsPath(path);
@@ -380,7 +372,6 @@ exports.mkdir = function(path, mode, callback) {
 		mode = '0777';
 	}
 
-	callback = callback || function() {};
 	callback = delayCallback(callback);
 
 	var dir = parentDir(path);
