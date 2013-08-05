@@ -87,20 +87,21 @@ describe('rename', function () {
 
 	it('should rename a file', function(done) {
 
-		// retrieve the contents of the original file
-		fq.readFile('file-to-rename', {encoding: 'utf8'}, function(err, contents) {
+		var text = 'this file will be renamed';
+
+		fs.writeFile(makePath('file-to-rename'), text, function(err) {
 
 			assert.ifError(err);
 
-			fq.rename('file-to-rename', 'this_is_a_different_file', function(err) {
+			fq.rename(makePath('file-to-rename'), makePath('this_is_a_different_file'), function(err) {
 
 				assert.ifError(err);
 
-				fq.readFile('this_is_a_different_file', {encoding: 'utf8'}, function(err, renamed_contents) {
+				fs.readFile('this_is_a_different_file', {encoding: 'utf8'}, function(err, contents) {
 
 					assert.ifError(err);
 
-					assert.equal(contents, renamed_contents);
+					assert.equal(contents, text);
 
 					done();
 				});
