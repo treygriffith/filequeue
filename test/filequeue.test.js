@@ -265,6 +265,13 @@ describe('exists', function() {
 
 describe('mkdir', function() {
 
+	function modeString(stats) {
+		return '0' + (stats.mode & parseInt('777', 8)).toString(8);
+	}
+
+	// change the default mask so it doesn't affect the ops below
+	process.umask(0000);
+
 	it('should create a new directory with the default mode', function(done) {
 		var dirname = 'newdir';
 
@@ -274,7 +281,7 @@ describe('mkdir', function() {
 			var stats = fs.statSync(makePath(dirname));
 
 			assert.equal(stats.isDirectory(), true);
-			assert.equal(stats.mode, 511 /* 0777 */);
+			assert.equal(modeString(stats), '0777');
 
 			done();
 		});
@@ -289,7 +296,7 @@ describe('mkdir', function() {
 			var stats = fs.statSync(makePath(dirname));
 
 			assert.equal(stats.isDirectory(), true);
-			assert.equal(stats.mode, parseInt(mode, 8));
+			assert.equal(modeString(stats), mode);
 
 			done();
 		});
