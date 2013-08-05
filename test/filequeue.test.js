@@ -228,13 +228,18 @@ describe('readdir', function() {
 
 	it('should return all filenames', function(done) {
 
-		fq.readdir('.', function(err, _files) {
+		fq.readdir(dir, function(err, files) {
 
 			assert.ifError(err);
 
-			assert.equal(Object.keys(fs.__internal.filesystem.files).length, _files.length);
+			fs.readdir(dir, function(err, _files) {
 
-			done();
+				assert.ifError(err);
+
+				assert.equal(_files.length, files.length);
+
+				done();
+			});
 		});
 	});
 
