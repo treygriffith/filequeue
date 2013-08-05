@@ -158,13 +158,15 @@ describe('writeFile', function() {
 
 	it('should write file contents', function(done) {
 
-		fq.writeFile('my_path', 'some different data', {encoding: 'utf8'}, function(err) {
+		var text = 'some different data';
+
+		fq.writeFile(makePath('my_path'), text, {encoding: 'utf8'}, function(err) {
 
 			assert.ifError(err);
 
-			fq.readFile('my_path', {encoding: 'utf8'}, function(err, data) {
+			fs.readFile(makePath('my_path'), {encoding: 'utf8'}, function(err, data) {
 
-				assert.equal(data, 'some different data');
+				assert.equal(data, text);
 				done();
 			});
 		});
@@ -175,11 +177,11 @@ describe('writeFile', function() {
 		for(var i=0;i<1000;i++) {
 			(function(num) {
 
-				fq.writeFile('my_path_'+num, 'some different data '+num, {encoding: 'utf8'}, function(err) {
+				fq.writeFile(makePath('my_path_'+num), 'some different data '+num, {encoding: 'utf8'}, function(err) {
 
 					assert.ifError(err);
 
-					fq.readFile('my_path_'+num, {encoding: 'utf8'}, function(err, data) {
+					fq.readFile(makePath('my_path_'+num), {encoding: 'utf8'}, function(err, data) {
 
 						assert.equal(data, 'some different data '+num);
 
@@ -202,14 +204,19 @@ describe('stat', function() {
 
 	it('should return a stats object', function(done) {
 
-		fq.stat('my_path', function(err, stats) {
+		fq.stat(makePath('my_path'), function(err, stats) {
 
 			assert.ifError(err);
 
-			assert.equal(stats.isFile(), fs.__internal.fsPath('my_path').data instanceof Buffer);
-			assert.equal(stats.isDirectory(), fs.__internal.isDirectory(fs.__internal.fsPath('my_path')));
+			fs.stat(makePath('my_path'), function(err, realStats) {
 
-			done();
+				assert.ifError(err);
+
+				assert.equal(stats.isFile(), realStats.isFile());
+				assert.equal(stats.isDirectory(), realStats.isDirectory());
+
+				done();
+			});
 		});
 	});
 
