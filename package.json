@@ -1,7 +1,7 @@
 {
   "name": "filequeue",
   "description": "Drop-in Replacement for fs to prevent too many open files",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "author": {
     "name": "Trey Griffith",
     "email": "trey.griffith@gmail.com"
@@ -20,7 +20,7 @@
   },
   "main": "./index.js",
   "engines": {
-    "node": "0.8.x"
+    "node": "0.10.x"
   },
   "repository": {
     "type": "git",
