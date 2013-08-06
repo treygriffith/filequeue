@@ -342,14 +342,15 @@ describe('readStream', function() {
 		var my_path_string = fs.readFileSync(makePath('my_path'), {encoding: 'utf8'});
 
 		var count = 0,
-			streams = []
+			streams = [];
+
 		for(var i=0;i<1000;i++) {
 
 			(function(i) {
 
 				streams.push(fq.createReadStream(makePath('my_path'), {encoding: 'utf8'}));
 
-				streams[i].fq_data = ''
+				streams[i].fq_data = '';
 
 				streams[i].on('data', function(data) {
 
@@ -383,6 +384,8 @@ describe('writeStream', function() {
 		var stream = fq.createWriteStream(makePath('my_path'), {encoding: 'utf8'});
 
 		assert.ok(stream instanceof fs.WriteStream);
+
+		stream.end();
 	});
 
 	it('writes data to a WriteStream', function(done) {
@@ -420,44 +423,43 @@ describe('writeStream', function() {
 		write();
 	});
 
-	it('reads data from lots of streams without crashing', function(done) {
+	it('writes data to lots of streams without crashing', function(done) {
 		done();
-		/*
 
-		var my_path_string = fs.readFileSync(makePath('my_path'), {encoding: 'utf8'});
+		var my_path_arr = 'this is some data that I want to write'.split(' ');
+
+		function write(stream) {
+
+			stream.write(my_path_arr[stream.i], 'utf8', function() {
+
+				stream.i++;
+
+				if(stream.i < my_path_arr.length) {
+					write(stream);
+				} else {
+
+					stream.end(function() {
+
+						assert.equal(my_path_arr.join(''), fs.readFileSync(makePath('my_other_writing_path'), {encoding: 'utf8'}));
+
+						done();
+					});
+				}
+			});
+		}
 
 		var count = 0,
-			streams = []
+			streams = [];
+
 		for(var i=0;i<1000;i++) {
 
-			(function(i) {
+			streams.push(fq.createWriteStream(makePath('my_other_writing_path'), {encoding: 'utf8'}));
 
-				streams.push(fq.createWriteStream(makePath('my_path'), {encoding: 'utf8'}));
+			streams[i].i = 0;
 
-				streams[i].fq_data = ''
+			write(streams[i]);
 
-				streams[i].on('data', function(data) {
-
-					streams[i].fq_data += data;
-				});
-
-				streams[i].on('error', function(err) {
-
-					assert.ifError(err);
-				});
-
-				streams[i].on('close', function() {
-
-					assert.equal(my_path_string, streams[i].fq_data);
-
-					if(++count >= 1000) {
-						done();
-					}
-				});
-
-			})(i);
 		}
-		*/
 	});
 });
 
