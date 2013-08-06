@@ -1,14 +1,17 @@
 // Run this with "mocha filequeue.test.js"
 
 var assert = require('assert');
-var rewire = require('rewire');
+var temp = require('temp');
+var fs = require('fs');
+var path = require('path');
 
-var FileQueue = rewire('../lib/filequeue');
+var FileQueue = require('../lib/filequeue');
 
-// Shim in our controlled version of fs
-var fs = require('./fs-shim');
-FileQueue.__set__('fs', fs);
+var dir = temp.mkdirSync('filequeue-test-');
 
+function makePath(filename) {
+	return path.join(dir, filename);
+}
 
 describe('FileQueue', function() {
 
@@ -31,50 +34,74 @@ describe('FileQueue', function() {
 
 });
 
+// set `newQueue` to true so we don't get the instance with a limit of 2000
+var fq = new FileQueue(true);
+
 describe('readFile', function() {
 
-	var fq = new FileQueue(200);
-
 	it('should read file contents', function(done) {
-		fq.readFile('my_path', function(err, data) {
-			assert.equal(data, fs.__internal.filesystem.files['my_path'].data);
-			done();
+
+		var text = 'some random text';
+
+		fs.writeFile(makePath('my_path'), text, function(err) {
+
+			assert.ifError(err);
+
+			fq.readFile(makePath('my_path'), {encoding: 'utf8'}, function(err, data) {
+
+				assert.ifError(err);
+
+				assert.equal(data, text);
+
+				done();
+			});
 		});
 	});
 
 	it('should read many files without crashing', function(done) {
-		var count = 0;
-		for(var i=0;i<1000;i++) {
-			fq.readFile('my_other_path', function(err, data) {
-				assert.equal(data, fs.__internal.filesystem.files['my_other_path'].data);
 
-				if(++count >= 1000) {
-					done();
-				}
-			});
-		}
+		var text = 'some other text';
+
+		fs.writeFile(makePath('my_other_path'), text, function(err) {
+
+			assert.ifError(err);
+
+			var count = 0;
+			for(var i=0;i<1000;i++) {
+				fq.readFile(makePath('my_other_path'), {encoding: 'utf8'}, function(err, data) {
+
+					assert.ifError(err);
+
+					assert.equal(data, text);
+
+					if(++count >= 1000) {
+						done();
+					}
+				});
+			}
+		});
 	});
 });
 
 describe('rename', function () {
-	var fq = new FileQueue();
 
 	it('should rename a file', function(done) {
 
-		// retrieve the contents of the original file
-		fq.readFile('file-to-rename', {encoding: 'utf8'}, function(err, contents) {
+		var text = 'this file will be renamed';
+
+		fs.writeFile(makePath('file-to-rename'), text, function(err) {
 
 			assert.ifError(err);
 
-			fq.rename('file-to-rename', 'this_is_a_different_file', function(err) {
+			fq.rename(makePath('file-to-rename'), makePath('this_is_a_different_file'), function(err) {
 
 				assert.ifError(err);
 
-				fq.readFile('this_is_a_different_file', {encoding: 'utf8'}, function(err, renamed_contents) {
+				fs.readFile(makePath('this_is_a_different_file'), {encoding: 'utf8'}, function(err, contents) {
 
 					assert.ifError(err);
 
-					assert.equal(contents, renamed_contents);
+					assert.equal(contents, text);
 
 					done();
 				});
@@ -85,31 +112,28 @@ describe('rename', function () {
 });
 
 describe('symlink', function () {
-	var fq = new FileQueue();
 
 	it('should create symlink without optional "type" argument', function(done) {
 
-		// grab the contents of the source file
-		fq.readFile('file-to-point-at', {encoding: 'utf8'}, function(err, contents) {
+		var text = "this file will be symlinked";
+
+		fs.writeFile(makePath('file-to-point-at'), text, function(err) {
 
 			assert.ifError(err);
 
-			fq.symlink('file-to-point-at', 'symlink1', function(err) {
+			fq.symlink(makePath('file-to-point-at'), makePath('symlink1'), function(err) {
 
 				assert.ifError(err);
 
-				// check that file is symlink (should do this with fq.lstat once implemented)
-				assert.equal(fs.__internal.filesystem.files['symlink1'].type, 'symlink');
-
-				// check that the contents are identical
-				fq.readFile('symlink1', {encoding: 'utf8'}, function(err, symlinked_contents) {
+				fs.lstat(makePath('symlink1'), function(err, stats) {
 
 					assert.ifError(err);
 
-					assert.equal(contents, symlinked_contents);
+					// make sure we created a symlink
+					assert.ok(stats.isSymbolicLink());
 
 					// check that we can't create another symlink with the same name
-					fq.symlink('another-file-to-point-at', 'symlink1', function(err) {
+					fq.symlink(makePath('file-to-point-at'), makePath('symlink1'), function(err) {
 
 						assert.notEqual(err, null, 'expected error: path already exists');
 
@@ -118,52 +142,28 @@ describe('symlink', function () {
 				});
 			});
 		});
+
 	});
 
-	it('should create symlink with optional "type" argument', function(done) {
+	it('should create symlink with optional "type" argument', function() {
 
-		// grab the contents of the source file
-		fq.readFile('file-to-point-at', {encoding: 'utf8'}, function(err, contents) {
-
-			assert.ifError(err);
-
-			fq.symlink('file-to-point-at', 'symlink2', 'file', function(err) {
-
-				assert.ifError(err);
-
-				// check that file is symlink, (should do this with fq.lstat once implemented)
-				assert.equal(fs.__internal.filesystem.files['symlink2'].type, 'symlink');
-
-				// check that the contents are identical
-				fq.readFile('symlink2', 'utf8', function(err, symlinked_contents) {
-
-					assert.ifError(err);
-
-					assert.equal(contents, symlinked_contents);
-
-					// check that the type of symlink is correct
-					assert.equal(fs.__internal.filesystem.files['symlink2'].windows_type, 'file');
-
-					done();
-				});
-			});
-		});
+		// only applicable on windows environments, which I don't have a box for
 	});
 });
 
 describe('writeFile', function() {
 
-	var fq = new FileQueue();
-
 	it('should write file contents', function(done) {
 
-		fq.writeFile('my_path', 'some different data', {encoding: 'utf8'}, function(err) {
+		var text = 'some different data';
+
+		fq.writeFile(makePath('my_path'), text, {encoding: 'utf8'}, function(err) {
 
 			assert.ifError(err);
 
-			fq.readFile('my_path', {encoding: 'utf8'}, function(err, data) {
+			fs.readFile(makePath('my_path'), {encoding: 'utf8'}, function(err, data) {
 
-				assert.equal(data, 'some different data');
+				assert.equal(data, text);
 				done();
 			});
 		});
@@ -174,11 +174,11 @@ describe('writeFile', function() {
 		for(var i=0;i<1000;i++) {
 			(function(num) {
 
-				fq.writeFile('my_path_'+num, 'some different data '+num, {encoding: 'utf8'}, function(err) {
+				fq.writeFile(makePath('my_path_'+num), 'some different data '+num, {encoding: 'utf8'}, function(err) {
 
 					assert.ifError(err);
 
-					fq.readFile('my_path_'+num, {encoding: 'utf8'}, function(err, data) {
+					fq.readFile(makePath('my_path_'+num), {encoding: 'utf8'}, function(err, data) {
 
 						assert.equal(data, 'some different data '+num);
 
@@ -197,18 +197,21 @@ describe('writeFile', function() {
 
 describe('stat', function() {
 
-	var fq = new FileQueue();
-
 	it('should return a stats object', function(done) {
 
-		fq.stat('my_path', function(err, stats) {
+		fq.stat(makePath('my_path'), function(err, stats) {
 
 			assert.ifError(err);
 
-			assert.equal(stats.isFile(), fs.__internal.fsPath('my_path').data instanceof Buffer);
-			assert.equal(stats.isDirectory(), fs.__internal.isDirectory(fs.__internal.fsPath('my_path')));
+			fs.stat(makePath('my_path'), function(err, realStats) {
 
-			done();
+				assert.ifError(err);
+
+				assert.equal(stats.isFile(), realStats.isFile());
+				assert.equal(stats.isDirectory(), realStats.isDirectory());
+
+				done();
+			});
 		});
 	});
 
@@ -216,17 +219,20 @@ describe('stat', function() {
 
 describe('readdir', function() {
 
-	var fq = new FileQueue();
-
 	it('should return all filenames', function(done) {
 
-		fq.readdir('.', function(err, _files) {
+		fq.readdir(dir, function(err, files) {
 
 			assert.ifError(err);
 
-			assert.equal(Object.keys(fs.__internal.filesystem.files).length, _files.length);
+			fs.readdir(dir, function(err, _files) {
 
-			done();
+				assert.ifError(err);
+
+				assert.equal(_files.length, files.length);
+
+				done();
+			});
 		});
 	});
 
@@ -234,13 +240,11 @@ describe('readdir', function() {
 
 describe('exists', function() {
 
-	var fq = new FileQueue();
-
 	it('should check if a file exists', function(done) {
 
-		fq.exists('my_path', function(exists) {
+		fq.exists(makePath('my_path'), function(exists) {
 
-			assert.equal(exists, !!fs.__internal.fsPath('my_path'));
+			assert.equal(exists, fs.existsSync(makePath('my_path')));
 
 			done();
 		});
@@ -248,9 +252,9 @@ describe('exists', function() {
 
 	it('should confirm that a file does not exist', function(done) {
 
-		fq.exists('this_file_doesnt_exist', function(exists) {
+		fq.exists(makePath('this_file_doesnt_exist'), function(exists) {
 
-			assert.equal(exists, !!fs.__internal.fsPath('this_file_doesnt_exist'));
+			assert.equal(exists, fs.existsSync(makePath('this_file_doesnt_exist')));
 
 			done();
 		});
@@ -261,16 +265,23 @@ describe('exists', function() {
 
 describe('mkdir', function() {
 
-	var fq = new FileQueue();
+	function modeString(stats) {
+		return '0' + (stats.mode & parseInt('777', 8)).toString(8);
+	}
+
+	// change the default mask so it doesn't affect the ops below
+	process.umask(0000);
 
 	it('should create a new directory with the default mode', function(done) {
 		var dirname = 'newdir';
 
-		fq.mkdir(dirname, function(err) {
+		fq.mkdir(makePath(dirname), function(err) {
 			assert.ifError(err);
 
-			assert.equal(fs.__internal.isDirectory(fs.__internal.filesystem.files[dirname]), true);
-			assert.equal(fs.__internal.filesystem.files[dirname].mode, '0777');
+			var stats = fs.statSync(makePath(dirname));
+
+			assert.equal(stats.isDirectory(), true);
+			assert.equal(modeString(stats), '0777');
 
 			done();
 		});
@@ -279,15 +290,176 @@ describe('mkdir', function() {
 	it('should create a new directory with a custom mode', function(done) {
 		var dirname = 'otherpath';
 		var mode = '0666';
-		fq.mkdir(dirname, mode, function(err) {
+		fq.mkdir(makePath(dirname), mode, function(err) {
 			assert.ifError(err);
 
-			assert.equal(fs.__internal.isDirectory(fs.__internal.filesystem.files[dirname]), true);
-			assert.equal(fs.__internal.filesystem.files[dirname].mode, mode);
+			var stats = fs.statSync(makePath(dirname));
+
+			assert.equal(stats.isDirectory(), true);
+			assert.equal(modeString(stats), mode);
 
 			done();
 		});
 	});
 
+});
+
+describe('readStream', function() {
+
+	it('creates a ReadStream', function() {
+
+		var stream = fq.createReadStream(makePath('my_path'), {encoding: 'utf8'});
+
+		assert.ok(stream instanceof fs.ReadStream);
+	});
+
+	it('reads data from a ReadStream', function(done) {
+
+		var stream = fq.createReadStream(makePath('my_path'), {encoding: 'utf8'});
+
+		var my_path_string = '';
+
+		stream.on('data', function(data) {
+
+			my_path_string += data;
+		});
+
+		stream.on('error', function(err) {
+
+			assert.ifError(err);
+		});
+
+		stream.on('close', function() {
+
+			assert.equal(my_path_string, fs.readFileSync(makePath('my_path'), {encoding: 'utf8'}));
+
+			done();
+		});
+	});
+
+	it('reads data from lots of streams without crashing', function(done) {
+
+		var my_path_string = fs.readFileSync(makePath('my_path'), {encoding: 'utf8'});
+
+		var count = 0,
+			streams = [];
+
+		for(var i=0;i<1000;i++) {
+
+			(function(i) {
+
+				streams.push(fq.createReadStream(makePath('my_path'), {encoding: 'utf8'}));
+
+				streams[i].fq_data = '';
+
+				streams[i].on('data', function(data) {
+
+					streams[i].fq_data += data;
+				});
+
+				streams[i].on('error', function(err) {
+
+					assert.ifError(err);
+				});
+
+				streams[i].on('close', function() {
+
+					assert.equal(my_path_string, streams[i].fq_data);
+
+					if(++count >= 1000) {
+						done();
+					}
+				});
+
+			})(i);
+		}
+	});
+
+});
+
+describe('writeStream', function() {
+
+	it('creates a WriteStream', function() {
+
+		var stream = fq.createWriteStream(makePath('my_path'), {encoding: 'utf8'});
+
+		assert.ok(stream instanceof fs.WriteStream);
+
+		stream.end();
+	});
+
+	it('writes data to a WriteStream', function(done) {
+
+		var stream = fq.createWriteStream(makePath('my_writing_path'), {encoding: 'utf8'});
+
+		stream.on('error', function(err) {
+
+			assert.ifError(err);
+		});
+
+		var my_path_arr = 'this is some data that I want to write'.split(' ');
+
+		var i = 0;
+		function write() {
+
+			stream.write(my_path_arr[i], 'utf8', function() {
+
+				i++;
+
+				if(i < my_path_arr.length) {
+					write();
+				} else {
+
+					stream.end(function() {
+
+						assert.equal(my_path_arr.join(''), fs.readFileSync(makePath('my_writing_path'), {encoding: 'utf8'}));
+
+						done();
+					});
+				}
+			});
+		}
+
+		write();
+	});
+
+	it('writes data to lots of streams without crashing', function(done) {
+		done();
+
+		var my_path_arr = 'this is some data that I want to write'.split(' ');
+
+		function write(stream) {
+
+			stream.write(my_path_arr[stream.i], 'utf8', function() {
+
+				stream.i++;
+
+				if(stream.i < my_path_arr.length) {
+					write(stream);
+				} else {
+
+					stream.end(function() {
+
+						assert.equal(my_path_arr.join(''), fs.readFileSync(makePath('my_other_writing_path'), {encoding: 'utf8'}));
+
+						done();
+					});
+				}
+			});
+		}
+
+		var count = 0,
+			streams = [];
+
+		for(var i=0;i<1000;i++) {
+
+			streams.push(fq.createWriteStream(makePath('my_other_writing_path'), {encoding: 'utf8'}));
+
+			streams[i].i = 0;
+
+			write(streams[i]);
+
+		}
+	});
 });
 

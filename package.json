@@ -15,8 +15,8 @@
   "dependencies": {
   },
   "devDependencies": {
-    "rewire": "1.1.1",
-    "mocha": "1.7.4"
+    "mocha": "1.7.4",
+    "temp": "0.5.x"
   },
   "main": "./index.js",
   "engines": {
