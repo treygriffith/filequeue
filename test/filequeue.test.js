@@ -378,5 +378,86 @@ describe('readStream', function() {
 
 describe('writeStream', function() {
 
+	it('creates a WriteStream', function() {
+
+		var stream = fq.createWriteStream(makePath('my_path'), {encoding: 'utf8'});
+
+		assert.ok(stream instanceof fs.WriteStream);
+	});
+
+	it('writes data to a WriteStream', function(done) {
+
+		var stream = fq.createWriteStream(makePath('my_writing_path'), {encoding: 'utf8'});
+
+		stream.on('error', function(err) {
+
+			assert.ifError(err);
+		});
+
+		var my_path_arr = 'this is some data that I want to write'.split(' ');
+
+		var i = 0;
+		function write() {
+
+			stream.write(my_path_arr[i], 'utf8', function() {
+
+				i++;
+
+				if(i < my_path_arr.length) {
+					write();
+				} else {
+
+					stream.end(function() {
+
+						assert.equal(my_path_arr.join(''), fs.readFileSync(makePath('my_writing_path'), {encoding: 'utf8'}));
+
+						done();
+					});
+				}
+			});
+		}
+
+		write();
+	});
+
+	it('reads data from lots of streams without crashing', function(done) {
+		done();
+		/*
+
+		var my_path_string = fs.readFileSync(makePath('my_path'), {encoding: 'utf8'});
+
+		var count = 0,
+			streams = []
+		for(var i=0;i<1000;i++) {
+
+			(function(i) {
+
+				streams.push(fq.createWriteStream(makePath('my_path'), {encoding: 'utf8'}));
+
+				streams[i].fq_data = ''
+
+				streams[i].on('data', function(data) {
+
+					streams[i].fq_data += data;
+				});
+
+				streams[i].on('error', function(err) {
+
+					assert.ifError(err);
+				});
+
+				streams[i].on('close', function() {
+
+					assert.equal(my_path_string, streams[i].fq_data);
+
+					if(++count >= 1000) {
+						done();
+					}
+				});
+
+			})(i);
+		}
+		*/
+	});
 });
 
